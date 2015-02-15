@@ -77,9 +77,15 @@ class Environment(dict):
         '/usr/local/share/arduino',
         '/usr/share/arduino',
     ]
+    arduino_prefs_file = None
+    arduino_prefs_file_guesses = [
+        os.path.expanduser('~/.arduino/')
+    ]
 
     if platform.system() == 'Darwin':
         arduino_dist_dir_guesses.insert(0, '/Applications/Arduino.app/Contents/Resources/Java')
+
+        arduino_prefs_file_guesses.insert(0, os.path.expanduser('~/Library/Arduino*'))
 
     default_board_model = 'uno'
     ino = sys.argv[0]
@@ -194,6 +200,9 @@ class Environment(dict):
         places = self.arduino_dist_places(dirname_parts) + ['$PATH']
         return self.find_file(key, items, places, human_name, multi=multi)
 
+    def find_prefs_file(self, key=None, items=None, human_name=None, multi=False):
+        return self.find_file(key, items=items or ['preferences.txt'], places=self.arduino_prefs_file_places(), human_name=human_name, multi=multi)
+
     def arduino_dist_places(self, dirname_parts):
         """
         For `dirname_parts` like [a, b, c] return list of
@@ -207,6 +216,32 @@ class Environment(dict):
         else:
             places = self.arduino_dist_dir_guesses
         return [os.path.join(p, *dirname_parts) for p in places]
+
+    def arduino_prefs_file_places(self):
+        if 'arduino_prefs_file' in self:
+            places = [self['arduino_prefs_file']]
+        else:
+            places = self.arduino_prefs_file_guesses
+        return places
+
+    def arduino_ide_pref(self, key):
+        """
+        Try to retrieve an entry from the preferences of the arduino IDE given its key
+        """
+
+        prefs_file = self.find_prefs_file('prefs_file')
+
+        if os.path.isfile(prefs_file):
+            fp = open(prefs_file)
+            prefs = fp.read().split('\n')
+            fp.close()
+
+            for line in prefs:
+                kv = line.split('=')
+                if len(kv) == 2 and kv[0] == key:
+                    return kv[1].strip()
+
+        return None
 
     def board_models(self):
         if 'board_models' in self:
