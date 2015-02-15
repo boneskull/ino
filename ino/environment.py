@@ -80,11 +80,17 @@ class Environment(dict):
         '~/Documents/Arduino',
         '~/sketchbook'
     ]
+    arduino_prefs_file = None
+    arduino_prefs_file_guesses = [
+        os.path.expanduser('~/.arduino/preferences.txt')
+    ]
 
     if platform.system() == 'Darwin':
         arduino_dist_dir_guesses.insert(0, '/Applications/Arduino.app/Contents/Resources/Java')
         arduino_dist_dir_guesses.insert(0, os.path.expanduser('~/Documents/Arduino'))
         arduino_dist_dir_guesses.insert(1, '/Applications/Arduino.app/Contents/Java')
+
+        arduino_prefs_file_guesses.insert(0, os.path.expanduser('~/Library/Arduino*'))
 
     default_board_model = 'uno'
     ino = sys.argv[0]
@@ -212,6 +218,9 @@ class Environment(dict):
 
         return self.find_dir(key, None, places, human_name=human_name, warn_only=True, multi=multi)
 
+    def find_prefs_file(self, key=None, items=None, human_name=None, multi=False):
+        return self.find_file(key, items=items or ['preferences.txt'], places=self.arduino_prefs_file_places(), human_name=human_name, multi=multi)
+
     def arduino_dist_places(self, dirname_parts):
         """
         For `dirname_parts` like [a, b, c] return list of
@@ -229,18 +238,19 @@ class Environment(dict):
     def arduino_sketchbook_places(self, dirname_parts):
         return [os.path.join(p, *dirname_parts) for p in self.arduino_sketchbook_dir_guesses]
 
-    @staticmethod
-    def arduino_ide_pref(key):
+    def arduino_prefs_file_places(self):
+        if 'arduino_prefs_file' in self:
+            places = [self['arduino_prefs_file']]
+        else:
+            places = self.arduino_prefs_file_guesses
+        return places
+
+    def arduino_ide_pref(self, key):
         """
         Try to retrieve an entry from the preferences of the arduino IDE given its key
         """
 
-        if platform.system() == 'Darwin':
-            prefs_file = os.path.expanduser('~/Library/Arduino/preferences.txt')
-        elif platform.system() == 'Linux':
-            prefs_file = os.path.expanduser('~/.arduino/preferences.txt')
-        else:
-            return None
+        prefs_file = self.find_prefs_file('prefs_file')
 
         if os.path.isfile(prefs_file):
             fp = open(prefs_file)
