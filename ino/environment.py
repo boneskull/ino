@@ -3,7 +3,6 @@
 import sys
 import os.path
 import itertools
-import argparse
 import pickle
 import platform
 import hashlib
@@ -102,8 +101,8 @@ class Environment(dict):
         with open(self.dump_filepath, 'rb') as f:
             try:
                 self.update(pickle.load(f))
-            except:
-                print colorize('Environment dump exists (%s), but failed to load' % 
+            except TypeError:
+                print colorize('Environment dump exists (%s), but failed to load' %
                                self.dump_filepath, 'yellow')
 
     @property
@@ -152,7 +151,7 @@ class Environment(dict):
         places = map(os.path.expanduser, places)
 
         glob_places = itertools.chain.from_iterable(glob(p) for p in places)
-        
+
         print 'Searching for', human_name, '...',
         results = []
         for p in glob_places:
@@ -230,7 +229,8 @@ class Environment(dict):
     def arduino_sketchbook_places(self, dirname_parts):
         return [os.path.join(p, *dirname_parts) for p in self.arduino_sketchbook_dir_guesses]
 
-    def arduino_ide_pref(self, key):
+    @staticmethod
+    def arduino_ide_pref(key):
         """
         Try to retrieve an entry from the preferences of the arduino IDE given its key
         """
@@ -263,7 +263,7 @@ class Environment(dict):
         # - hardware/arduino/{chipset}/boards.txt (Arduino 1.5.x, chipset like `avr`, `sam`)
         # - hardware/{platform}/boards.txt (MPIDE 0.xx, platform like `arduino`, `pic32`)
         # we should find and merge them all
-        boards_txts = self.find_arduino_file('boards.txt', ['hardware', '**'], 
+        boards_txts = self.find_arduino_file('boards.txt', ['hardware', '**'],
                                              human_name='Board description file (boards.txt)',
                                              multi=True)
 
@@ -310,19 +310,20 @@ class Environment(dict):
 
     def board_model(self, key):
         return self.board_models()[key]
-    
+
     def add_board_model_arg(self, parser):
-        help = '\n'.join([
+        help_text = '\n'.join([
             "Arduino board model (default: %(default)s)",
-            "For a full list of supported models run:", 
+            "For a full list of supported models run:",
             "`ino list-models'"
         ])
 
-        parser.add_argument('-m', '--board-model', metavar='MODEL', 
-                            default=self.default_board_model, help=help)
+        parser.add_argument('-m', '--board-model', metavar='MODEL',
+                            default=self.default_board_model, help=help_text)
 
-    def add_arduino_dist_arg(self, parser):
-        parser.add_argument('-d', '--arduino-dist', metavar='PATH', 
+    @staticmethod
+    def add_arduino_dist_arg(parser):
+        parser.add_argument('-d', '--arduino-dist', metavar='PATH',
                             help='Path to Arduino distribution, e.g. ~/Downloads/arduino-0022.\nTry to guess if not specified')
 
     def serial_port_patterns(self):
@@ -370,8 +371,8 @@ class Environment(dict):
         # pair should go to a separate subdirectory
         build_dirname = board_model or self.default_board_model
         if arduino_dist:
-            hash = hashlib.md5(arduino_dist).hexdigest()[:8]
-            build_dirname = '%s-%s' % (build_dirname, hash)
+            dirname_hash = hashlib.md5(arduino_dist).hexdigest()[:8]
+            build_dirname = '%s-%s' % (build_dirname, dirname_hash)
 
         self['build_dir'] = os.path.join(self.output_dir, build_dirname)
 
@@ -393,5 +394,5 @@ class Environment(dict):
 
 class BoardModels(OrderedDict):
     def format(self):
-        map = [(key, val['name']) for key, val in self.iteritems() if 'name' in val]
-        return format_available_options(map, head_width=12, default=self.default)
+        model_map = [(key, val['name']) for key, val in self.iteritems() if 'name' in val]
+        return format_available_options(model_map, head_width=12)
