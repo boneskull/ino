@@ -203,14 +203,14 @@ class Environment(dict):
         places = self.arduino_dist_places(dirname_parts) + ['$PATH']
         return self.find_file(key, items, places, human_name, multi=multi)
 
-    def find_sketchbook_dir(self, key, dirname_parts, human_name=None):
+    def find_sketchbook_dir(self, key, dirname_parts, human_name=None, multi=True):
         sketchbook_path = self.arduino_ide_pref('sketchbook.path')
         if sketchbook_path is None:
             places = self.arduino_sketchbook_places(dirname_parts)
         else:
             places = [os.path.join(sketchbook_path, *dirname_parts)]
 
-        return self.find_dir(key, None, places, human_name=human_name, warn_only=True)
+        return self.find_dir(key, None, places, human_name=human_name, warn_only=True, multi=multi)
 
     def arduino_dist_places(self, dirname_parts):
         """

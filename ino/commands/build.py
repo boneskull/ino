@@ -5,6 +5,7 @@ import os.path
 import inspect
 import subprocess
 import platform
+import itertools
 import jinja2
 import shlex
 
@@ -130,11 +131,11 @@ class Build(Command):
             self.e.find_dir('arduino_variants_dir', ['.'], [variants_place],
                             human_name='Arduino variants directory')
 
-        self.e.find_arduino_dir('arduino_libraries_dir', ['libraries'],
-                                human_name='Arduino standard libraries')
+        self.e.find_arduino_dir('arduino_libraries_dir', ['**/libraries'],
+                                human_name='Arduino standard libraries', multi=True)
 
-        self.e.find_sketchbook_dir('sketchbook_lib_dir', ['libraries'],
-                                   human_name='Arduino sketchbook libraries')
+        self.e.find_sketchbook_dir('sketchbook_lib_dir', ['**/libraries'],
+                                   human_name='Arduino sketchbook libraries', multi=True)
 
         toolset = [
             ('make', args.make),
@@ -146,7 +147,7 @@ class Build(Command):
 
         for tool_key, tool_binary in toolset:
             self.e.find_arduino_tool(
-                tool_key, ['hardware', 'tools', 'avr', 'bin'], 
+                tool_key, ['hardware', 'tools', 'avr', 'bin'],
                 items=[tool_binary], human_name=tool_binary)
 
     def setup_flags(self, args):
@@ -158,7 +159,7 @@ class Build(Command):
             '-DF_CPU=' + board['build']['f_cpu'],
             '-DARDUINO=' + str(self.e.arduino_lib_version.as_int()),
             '-I' + self.e['arduino_core_dir'],
-        ]) 
+        ])
         # Add additional flags as specified
         self.e['cppflags'] += SpaceList(shlex.split(args.cppflags))
 
@@ -166,9 +167,9 @@ class Build(Command):
             self.e['cppflags'].append('-DUSB_VID=%s' % board['build']['vid'])
         if 'pid' in board['build']:
             self.e['cppflags'].append('-DUSB_PID=%s' % board['build']['pid'])
-            
+
         if self.e.arduino_lib_version.major:
-            variant_dir = os.path.join(self.e.arduino_variants_dir, 
+            variant_dir = os.path.join(self.e.arduino_variants_dir,
                                        board['build']['variant'])
             self.e.cppflags.append('-I' + variant_dir)
 
@@ -249,7 +250,9 @@ class Build(Command):
     def scan_dependencies(self):
         self.e['deps'] = SpaceList()
 
-        lib_dirs = [self.e.arduino_core_dir] + list_subdirs(self.e.lib_dir) + list_subdirs(self.e.arduino_libraries_dir)
+        lib_dirs = [self.e.arduino_core_dir] + list_subdirs(self.e.lib_dir) + \
+                   list(itertools.chain(
+                     *[list_subdirs(d) for d in self.e.arduino_libraries_dir]))
 
         if self.e.sketchbook_lib_dir is not None:
             lib_dirs += list_subdirs(self.e.sketchbook_lib_dir)
@@ -259,7 +262,7 @@ class Build(Command):
         # If lib A depends on lib B it have to appear before B in final
         # list so that linker could link all together correctly
         # but order of `_scan_dependencies` is not defined, so...
-        
+
         # 1. Get dependencies of sources in arbitrary order
         used_libs = list(self._scan_dependencies(self.e.src_dir, lib_dirs, inc_flags))
 
